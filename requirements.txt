@@ -4,3 +4,5 @@ transformers
 plotly
 pandas
 numpy
+scikit-learn
+huggingface_hub
