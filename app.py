@@ -11,6 +11,9 @@ from torch.nn.functional import softmax
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+import os
+import json
+from huggingface_hub import hf_hub_download, snapshot_download
 
 class BertForMultiTaskClassification(BertPreTrainedModel):
     """Custom BERT model for multi-task emotion and intensity classification"""
@@ -42,15 +45,87 @@ class BertForMultiTaskClassification(BertPreTrainedModel):
 def load_model_and_tokenizer():
     """Load the trained model, tokenizer, and label mappings"""
     
-    # First try to load from local directory (like inference.py)
+    # First try to load from local directory
     model_dir = "saved_bangla_emotion_model"
     
     try:
         return load_local_model(model_dir)
     except Exception as e:
         st.warning(f"Could not load local model: {e}")
-        st.info("Loading demo model instead...")
-        return load_demo_model()
+        st.info("Downloading model from Hugging Face...")
+        try:
+            # Download model from Hugging Face
+            download_model_from_hf()
+            return load_local_model(model_dir)
+        except Exception as hf_error:
+            st.error(f"Could not download from Hugging Face: {hf_error}")
+            st.info("Loading demo model instead...")
+            return load_demo_model()
+
+def download_model_from_hf():
+    """Download model files from Hugging Face"""
+    repo_id = "ashrafulparan/Emotion-BERT"
+    model_dir = "saved_bangla_emotion_model"
+    
+    # Create directory if it doesn't exist
+    os.makedirs(model_dir, exist_ok=True)
+    
+    # List of files to download
+    files_to_download = [
+        "config.json",
+        "pytorch_model.bin", 
+        "tokenizer_config.json",
+        "tokenizer.json",
+        "vocab.txt",
+        "labels_mapping.json"
+    ]
+    
+    st.write("Downloading model files...")
+    progress_bar = st.progress(0)
+    
+    for i, filename in enumerate(files_to_download):
+        try:
+            st.write(f"Downloading {filename}...")
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                local_dir=model_dir,
+                local_dir_use_symlinks=False
+            )
+            progress_bar.progress((i + 1) / len(files_to_download))
+        except Exception as e:
+            st.warning(f"Could not download {filename}: {e}")
+            if filename == "labels_mapping.json":
+                # Create a default labels mapping if not available
+                create_default_labels_mapping(model_dir)
+    
+    st.success("Model download completed!")
+
+def create_default_labels_mapping(model_dir):
+    """Create a default labels mapping if not available from HF"""
+    default_mapping = {
+        "emotions": ["angry", "fear", "happy", "love", "sad", "surprise"],
+        "intensities": ["low", "medium", "high"],
+        "id_to_emotion": {
+            "0": "angry",
+            "1": "fear", 
+            "2": "happy",
+            "3": "love",
+            "4": "sad",
+            "5": "surprise"
+        },
+        "id_to_intensity": {
+            "0": "low",
+            "1": "medium",
+            "2": "high"
+        }
+    }
+    
+    labels_path = os.path.join(model_dir, "labels_mapping.json")
+    with open(labels_path, 'w', encoding='utf-8') as f:
+        json.dump(default_mapping, f, indent=2, ensure_ascii=False)
+    
+    st.info("Created default labels mapping file.")
 
 def load_local_model(model_dir="saved_bangla_emotion_model"):
     """Load model from local directory (same as inference.py)"""
@@ -205,12 +280,31 @@ def main():
     
     st.title("🇧🇩 Bangla Emotion and Intensity Detection")
     st.markdown("### Analyze emotions and their intensity in Bangla text using BERT")
+      # Load model
+    with st.spinner("Loading model..."):
+        model, tokenizer, id_to_emotion, id_to_intensity = load_model_and_tokenizer()
     
-    # Sidebar with information
+    if model is None:
+        st.error("Failed to load model!")
+        st.stop()
+    
+    # Check if we loaded the actual model or demo model
+    model_dir = "saved_bangla_emotion_model"
+    if os.path.exists(os.path.join(model_dir, "pytorch_model.bin")):
+        st.success("✅ Actual trained model loaded successfully!")
+    else:
+        st.warning("⚠️ Demo model loaded (untrained weights). For actual predictions, upload your model files to Hugging Face.")
+    
+    # Update sidebar info based on model type
     with st.sidebar:
         st.header("About")
         st.write("This app uses a fine-tuned BERT model to detect emotions and their intensity in Bangla text.")
-        st.write("**Model:** ashrafulparan/Emotion-BERT")
+        
+        if os.path.exists(os.path.join(model_dir, "pytorch_model.bin")):
+            st.write("**Model:** ashrafulparan/Emotion-BERT (Trained)")
+        else:
+            st.write("**Model:** Demo model (Untrained)")
+            
         st.write("**Emotions:** Angry, Fear, Happy, Love, Sad, Surprise")
         st.write("**Intensity:** Low, Medium, High")
         
@@ -219,15 +313,6 @@ def main():
         st.write("2. Click 'Analyze Emotion' button")
         st.write("3. View the predicted emotion and intensity")
         st.write("4. Explore the probability distributions")
-    
-    # Load model
-    with st.spinner("Loading model from Hugging Face..."):
-        model, tokenizer, id_to_emotion, id_to_intensity = load_model_and_tokenizer()
-    
-    if model is None:
-        st.stop()
-    
-    st.success("Model loaded successfully!")
     
     # Input section
     st.header("📝 Input Text")
