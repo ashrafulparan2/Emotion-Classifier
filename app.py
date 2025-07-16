@@ -42,101 +42,84 @@ class BertForMultiTaskClassification(BertPreTrainedModel):
 def load_model_and_tokenizer():
     """Load the trained model, tokenizer, and label mappings"""
     
-    # Try to load from Hugging Face first
-    model_name = "ashrafulparan/Emotion-BERT"
-    
-    try:
-        # Try loading from Hugging Face
-        from huggingface_hub import hf_hub_download
-        import json
-        
-        # Download label mappings
-        labels_file = hf_hub_download(repo_id=model_name, filename="labels_mapping.json")
-        with open(labels_file, 'r', encoding='utf-8') as f:
-            label_mappings = json.load(f)
-        
-        emotions = label_mappings["emotions"]
-        intensities = label_mappings["intensities"]
-        id_to_emotion = {int(k): v for k, v in label_mappings["id_to_emotion"].items()}
-        id_to_intensity = {int(k): v for k, v in label_mappings["id_to_intensity"].items()}
-        
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
-        # Load config
-        config = AutoConfig.from_pretrained(model_name)
-        
-        # Create model with correct dimensions
-        model = BertForMultiTaskClassification(
-            config, 
-            num_emotions=len(emotions),
-            num_intensities=len(intensities)
-        )
-        
-        # Download and load model weights
-        model_file = hf_hub_download(repo_id=model_name, filename="pytorch_model.bin")
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        state_dict = torch.load(model_file, map_location=device)
-        model.load_state_dict(state_dict)
-        model.to(device)
-        model.eval()
-        
-        return model, tokenizer, id_to_emotion, id_to_intensity
-        
-    except Exception as e:
-        st.error(f"Error loading model from Hugging Face: {e}")
-        
-        # Fallback to local model if available
-        return load_local_model()
-
-def load_local_model():
-    """Fallback function to load model locally"""
+    # First try to load from local directory (like inference.py)
     model_dir = "saved_bangla_emotion_model"
     
     try:
-        import json
-        import os
-        
-        # Load label mappings
-        labels_path = os.path.join(model_dir, "labels_mapping.json")
-        with open(labels_path, 'r', encoding='utf-8') as f:
-            label_mappings = json.load(f)
-        
-        emotions = label_mappings["emotions"]
-        intensities = label_mappings["intensities"]
-        id_to_emotion = {int(k): v for k, v in label_mappings["id_to_emotion"].items()}
-        id_to_intensity = {int(k): v for k, v in label_mappings["id_to_intensity"].items()}
-        
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(model_dir)
-        
-        # Load model
-        config = AutoConfig.from_pretrained(model_dir)
-        
-        model = BertForMultiTaskClassification(
-            config, 
-            num_emotions=len(emotions),
-            num_intensities=len(intensities)
-        )
-        
-        # Load state dict
-        model_path = os.path.join(model_dir, "pytorch_model.bin")
-        if os.path.exists(model_path):
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            state_dict = torch.load(model_path, map_location=device)
-            model.load_state_dict(state_dict)
-            model.to(device)
-        
-        model.eval()
-        
-        return model, tokenizer, id_to_emotion, id_to_intensity
-        
+        return load_local_model(model_dir)
     except Exception as e:
-        st.error(f"Error loading local model: {e}")
-        st.error("Please make sure either:")
-        st.error("1. The model 'ashrafulparan/Emotion-BERT' is available on Hugging Face, OR")
-        st.error("2. The 'saved_bangla_emotion_model' directory exists locally with the trained model")
-        return None, None, None, None
+        st.warning(f"Could not load local model: {e}")
+        st.info("Loading demo model instead...")
+        return load_demo_model()
+
+def load_local_model(model_dir="saved_bangla_emotion_model"):
+    """Load model from local directory (same as inference.py)"""
+    import json
+    import os
+    
+    # Load label mappings
+    labels_path = os.path.join(model_dir, "labels_mapping.json")
+    with open(labels_path, 'r', encoding='utf-8') as f:
+        label_mappings = json.load(f)
+    
+    emotions = label_mappings["emotions"]
+    intensities = label_mappings["intensities"]
+    id_to_emotion = {int(k): v for k, v in label_mappings["id_to_emotion"].items()}
+    id_to_intensity = {int(k): v for k, v in label_mappings["id_to_intensity"].items()}
+    
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    
+    # Load model
+    config = AutoConfig.from_pretrained(model_dir)
+    
+    model = BertForMultiTaskClassification(
+        config, 
+        num_emotions=len(emotions),
+        num_intensities=len(intensities)
+    )
+    
+    # Load state dict
+    model_path = os.path.join(model_dir, "pytorch_model.bin")
+    if os.path.exists(model_path):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        state_dict = torch.load(model_path, map_location=device)
+        model.load_state_dict(state_dict)
+        model.to(device)
+    
+    model.eval()
+    
+    return model, tokenizer, id_to_emotion, id_to_intensity
+
+def load_demo_model():
+    """Create a demo model for demonstration purposes"""
+    import numpy as np
+    
+    # Define emotions and intensities (same as in inference.py)
+    emotions = ["angry", "fear", "happy", "love", "sad", "surprise"]
+    intensities = ["low", "medium", "high"]
+    
+    id_to_emotion = {i: emotion for i, emotion in enumerate(emotions)}
+    id_to_intensity = {i: intensity for i, intensity in enumerate(intensities)}
+    
+    # Load a standard BERT tokenizer for Bangla
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-multilingual-cased")
+    
+    # Create a simple config
+    config = AutoConfig.from_pretrained("bert-base-multilingual-cased")
+    
+    # Create model with demo dimensions
+    model = BertForMultiTaskClassification(
+        config,
+        num_emotions=len(emotions),
+        num_intensities=len(intensities)
+    )
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
+    
+    return model, tokenizer, id_to_emotion, id_to_intensity
 
 def predict_emotion_intensity(text, model, tokenizer, id_to_emotion, id_to_intensity):
     """Predict emotion and intensity for a single text"""

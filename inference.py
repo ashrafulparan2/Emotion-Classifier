@@ -36,7 +36,7 @@ class BertForMultiTaskClassification(BertPreTrainedModel):
 
         return (logits_emotion, logits_intensity)
 
-def load_model_and_tokenizer(model_dir="saved_bangla_emotion_model"):
+def load_model_and_tokenizer(model_dir="/kaggle/input/emotion-model/saved_bangla_emotion_model"):
     """Load the trained model, tokenizer, and label mappings"""
     
     # Load label mappings
@@ -117,15 +117,15 @@ def main():
     """Main function"""
     
     # Text to analyze (change this to your text)
-    text = "আমি আজ খুব খুশি এবং উৎসাহিত বোধ করছি"
+    text = "যার জন্য চুরি করি সেই বলে চোর !!"
     
-    print("Loading model...")
+    # print("Loading model...")
     
     try:
         # Load model and tokenizer
         model, tokenizer, id_to_emotion, id_to_intensity = load_model_and_tokenizer()
         
-        print("Model loaded successfully!")
+        # print("Model loaded successfully!")
         print(f"Analyzing text: '{text}'")
         print("-" * 50)
         
