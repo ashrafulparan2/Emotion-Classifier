@@ -1,7 +1,7 @@
 """
-Enhanced Streamlit App for Bangla Emotion and Intensity Detection
+Cloud-Ready Streamlit App for Bangla Emotion and Intensity Detection
+Optimized for deployment on Streamlit Cloud, Hugging Face Spaces, or other cloud platforms
 Uses the model from Hugging Face: ashrafulparan/Emotion-BERT
-Following the exact inference logic from the notebook
 """
 
 import streamlit as st
@@ -16,6 +16,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import json
 import random
+import os
+from huggingface_hub import hf_hub_download
+import warnings
+warnings.filterwarnings("ignore")
 
 # Set page config
 st.set_page_config(
@@ -49,10 +53,12 @@ def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
 set_seed(42)
 
@@ -135,7 +141,6 @@ class EmotionsDataset(Dataset):
         )
         item = {k: v.squeeze() for k, v in encoding.items()}
         
-        # For inference, we might not have labels
         if self.emotion_labels is not None and self.intensity_labels is not None:
             emotion_label = self.emotion_labels[idx]
             intensity_label = self.intensity_labels[idx]
@@ -145,40 +150,33 @@ class EmotionsDataset(Dataset):
 
 @st.cache_resource
 def load_model_and_tokenizer():
-    """Load the trained model, tokenizer, and label mappings"""
+    """Load the trained model, tokenizer, and label mappings from Hugging Face"""
     
     model_name = "ashrafulparan/Emotion-BERT"
     
     try:
-        st.info("Loading model from Hugging Face...")
-        
         # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
         
         # Load config
         config = AutoConfig.from_pretrained(model_name)
         
-        # Try to download and load label mappings
+        # Load label mappings
         try:
-            from huggingface_hub import hf_hub_download
             labels_file = hf_hub_download(repo_id=model_name, filename="labels_mapping.json")
             with open(labels_file, 'r', encoding='utf-8') as f:
                 label_mappings = json.load(f)
-        except:
-            # Use local labels_mapping.json if available
-            try:
-                with open('labels_mapping.json', 'r', encoding='utf-8') as f:
-                    label_mappings = json.load(f)
-            except:
-                # Default mappings based on the notebook
-                label_mappings = {
-                    "emotions": ["angry", "disgust", "fear", "happy", "sad", "surprise"],
-                    "intensities": ["0.0", "1.0", "2.0"],
-                    "emotion_to_id": {"angry": 0, "disgust": 1, "fear": 2, "happy": 3, "sad": 4, "surprise": 5},
-                    "id_to_emotion": {"0": "angry", "1": "disgust", "2": "fear", "3": "happy", "4": "sad", "5": "surprise"},
-                    "intensity_to_id": {"0.0": 0, "1.0": 1, "2.0": 2},
-                    "id_to_intensity": {"0": "0.0", "1": "1.0", "2": "2.0"}
-                }
+        except Exception as e:
+            st.warning(f"Could not load labels_mapping.json: {e}")
+            # Default mappings based on common emotion datasets
+            label_mappings = {
+                "emotions": ["angry", "disgust", "fear", "happy", "sad", "surprise"],
+                "intensities": ["0.0", "1.0", "2.0"],
+                "emotion_to_id": {"angry": 0, "disgust": 1, "fear": 2, "happy": 3, "sad": 4, "surprise": 5},
+                "id_to_emotion": {"0": "angry", "1": "disgust", "2": "fear", "3": "happy", "4": "sad", "5": "surprise"},
+                "intensity_to_id": {"0.0": 0, "1.0": 1, "2.0": 2},
+                "id_to_intensity": {"0": "0.0", "1": "1.0", "2": "2.0"}
+            }
         
         emotions = label_mappings["emotions"]
         intensities = label_mappings["intensities"]
@@ -189,35 +187,31 @@ def load_model_and_tokenizer():
         model = BertForMultiTaskClassification.from_pretrained(
             model_name,
             num_emotions=len(emotions),
-            num_intensities=len(intensities)
+            num_intensities=len(intensities),
+            torch_dtype=torch.float32,  # Ensure compatibility
+            low_cpu_mem_usage=True
         )
         
-        # Set device
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Set device (CPU for cloud deployment to avoid GPU costs)
+        device = torch.device("cpu")  # Use CPU for cloud deployment
         model.to(device)
         model.eval()
         
-        st.success(f"✅ Model loaded successfully from {model_name}")
-        st.info(f"📋 Emotions: {emotions}")
-        st.info(f"📋 Intensities: {intensities}")
-        st.info(f"🖥️ Device: {device}")
-        
-        return model, tokenizer, id_to_emotion, id_to_intensity, emotions, intensities
+        return model, tokenizer, id_to_emotion, id_to_intensity, emotions, intensities, device
         
     except Exception as e:
         st.error(f"❌ Error loading model from Hugging Face: {e}")
-        st.error("Please ensure the model 'ashrafulparan/Emotion-BERT' is available and accessible.")
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
-def predict_emotions_and_intensities(texts, model, tokenizer, id_to_emotion, id_to_intensity, batch_size=32):
+def predict_emotions_and_intensities(texts, model, tokenizer, id_to_emotion, id_to_intensity, device, batch_size=16):
     """
     Perform inference on a list of texts using the trained model (Same logic as notebook).
-    Returns predictions in the same format as training evaluation.
+    Optimized for cloud deployment with smaller batch sizes.
     """
     # Create dataset for inference
     dataset = EmotionsDataset(texts, tokenizer=tokenizer)
     
-    # Create data loader
+    # Create data loader with smaller batch size for cloud
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     
     # Store predictions
@@ -226,8 +220,7 @@ def predict_emotions_and_intensities(texts, model, tokenizer, id_to_emotion, id_
     
     with torch.no_grad():
         for batch in dataloader:
-            # Move batch to device (CPU/GPU)
-            device = next(model.parameters()).device
+            # Move batch to device
             batch = {k: v.to(device) for k, v in batch.items() if k != "labels"}
             
             # Get model predictions
@@ -242,7 +235,7 @@ def predict_emotions_and_intensities(texts, model, tokenizer, id_to_emotion, id_
     emotion_logits = np.concatenate(all_emotion_logits, axis=0)
     intensity_logits = np.concatenate(all_intensity_logits, axis=0)
     
-    # Convert logits to predictions (same as training)
+    # Convert logits to predictions
     emotion_predictions = np.argmax(emotion_logits, axis=1)
     intensity_predictions = np.argmax(intensity_logits, axis=1)
     
@@ -254,7 +247,7 @@ def predict_emotions_and_intensities(texts, model, tokenizer, id_to_emotion, id_
     emotion_probs = softmax(torch.tensor(emotion_logits), dim=1).numpy()
     intensity_probs = softmax(torch.tensor(intensity_logits), dim=1).numpy()
     
-    # Create results dataframe (same format as training)
+    # Create results dataframe
     results_df = pd.DataFrame({
         'text': texts,
         'predicted_emotion_id': emotion_predictions,
@@ -273,7 +266,6 @@ def create_emotion_chart(probabilities, labels, predicted_emotion):
     })
     df = df.sort_values('Probability', ascending=True)
     
-    # Color bars, highlight the predicted emotion
     colors = ['#FF6B6B' if emotion.lower() == predicted_emotion.lower() else '#4ECDC4' 
               for emotion in df['Emotion']]
     
@@ -285,7 +277,8 @@ def create_emotion_chart(probabilities, labels, predicted_emotion):
     fig.update_traces(marker_color=colors)
     fig.update_layout(
         height=300, 
-        showlegend=False,
+        showlegend=False, 
+        font=dict(size=12),
         xaxis=dict(title="Probability", range=[0, 1]),
         yaxis=dict(title="Emotion")
     )
@@ -294,7 +287,6 @@ def create_emotion_chart(probabilities, labels, predicted_emotion):
 
 def create_intensity_chart(probabilities, labels, predicted_intensity):
     """Create a bar chart for intensity probabilities"""
-    # Map intensity labels to more readable format
     intensity_map = {"0.0": "Low", "1.0": "Medium", "2.0": "High"}
     readable_labels = [intensity_map.get(label, label) for label in labels]
     
@@ -304,7 +296,6 @@ def create_intensity_chart(probabilities, labels, predicted_intensity):
     })
     df = df.sort_values('Probability', ascending=True)
     
-    # Color bars, highlight the predicted intensity
     predicted_readable = intensity_map.get(predicted_intensity, predicted_intensity)
     colors = ['#FF6B6B' if intensity == predicted_readable else '#FFB347' 
               for intensity in df['Intensity']]
@@ -317,7 +308,8 @@ def create_intensity_chart(probabilities, labels, predicted_intensity):
     fig.update_traces(marker_color=colors)
     fig.update_layout(
         height=250, 
-        showlegend=False,
+        showlegend=False, 
+        font=dict(size=12),
         xaxis=dict(title="Probability", range=[0, 1]),
         yaxis=dict(title="Intensity")
     )
@@ -336,8 +328,6 @@ def main():
         st.header("📖 About")
         st.write("This app uses a fine-tuned BERT model to detect emotions and their intensity in Bangla text.")
         st.write("**Model:** ashrafulparan/Emotion-BERT")
-        st.write("**Emotions:** Angry, Disgust, Fear, Happy, Sad, Surprise")
-        st.write("**Intensity Levels:** Low (0.0), Medium (1.0), High (2.0)")
         
         st.header("🔧 How to use")
         st.write("1. Enter your Bangla text in the text area")
@@ -345,34 +335,37 @@ def main():
         st.write("3. View the predicted emotion and intensity")
         st.write("4. Explore the probability distributions")
         
-        st.header("📊 Model Info")
-        st.write("- Based on Bangla BERT")
-        st.write("- Multi-task classification")
-        st.write("- Trained on Bangla emotion dataset")
-        st.write("- Follows exact notebook inference logic")
-        
         # Sample texts for quick testing
         st.header("🎯 Quick Examples")
         sample_texts = [
-            "আমি খুব খুশি আজকে।",
-            "এটা খুব দুঃখজনক খবর।",
-            "ভোটের হার কম হলে দোষ, বেশি হলে দোষ, ভোটের সময় মারামারি না হওয়াটাও দোষের, আসলে সমালোচকরা কী চায় ??",
-            "এই দৃশ্যটা দেখে আমি অবাক হয়ে গেছি।",
-            "আমি তোমাকে ভালোবাসি।"
+            "আমি খুব খুশি আজকে।",  # I am very happy today
+            "এটা খুব দুঃখজনক খবর।",  # This is very sad news
+            "আমি রাগে ফেটে পড়েছি।",  # I am very angry
+            "এই দৃশ্যটা দেখে আমি অবাক হয়ে গেছি।",  # I was surprised to see this
+            "আমি তোমাকে ভালোবাসি।"  # I love you
         ]
         
         st.write("Click to try these examples:")
         for i, text in enumerate(sample_texts):
             if st.button(f"Example {i+1}", key=f"example_{i}"):
                 st.session_state.text_input = text
+                st.rerun()
     
-    # Load model
-    with st.spinner("🔄 Loading model from Hugging Face..."):
-        model, tokenizer, id_to_emotion, id_to_intensity, emotions, intensities = load_model_and_tokenizer()
-    
-    if model is None:
+    # Load model with progress
+    with st.spinner("🔄 Loading model from Hugging Face... This may take a moment on first load."):
+        load_result = load_model_and_tokenizer()
+        
+    if load_result[0] is None:
         st.error("Failed to load model. Please check your connection and try again.")
         st.stop()
+    
+    model, tokenizer, id_to_emotion, id_to_intensity, emotions, intensities, device = load_result
+    
+    # Success message
+    st.success(f"✅ Model loaded successfully!")
+    st.info(f"📋 Emotions: {', '.join([e.title() for e in emotions])}")
+    st.info(f"📋 Intensities: Low, Medium, High")
+    st.info(f"🖥️ Running on: {device}")
     
     # Input section
     st.header("📝 Input Text")
@@ -401,10 +394,10 @@ def main():
     if analyze_button:
         if text_input.strip():
             with st.spinner("🧠 Analyzing emotion and intensity..."):
-                # Make prediction using the same logic as notebook
                 try:
+                    # Make prediction
                     results_df, emotion_logits, intensity_logits, emotion_probs, intensity_probs = predict_emotions_and_intensities(
-                        [text_input], model, tokenizer, id_to_emotion, id_to_intensity, batch_size=1
+                        [text_input], model, tokenizer, id_to_emotion, id_to_intensity, device, batch_size=1
                     )
                     
                     # Get results for the single text
@@ -421,7 +414,7 @@ def main():
                     # Results section
                     st.header("📊 Analysis Results")
                     
-                    # Main results with better formatting
+                    # Main results
                     col1, col2 = st.columns(2)
                     
                     with col1:
@@ -457,12 +450,10 @@ def main():
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        # Emotion probabilities
                         fig_emotion = create_emotion_chart(emotion_prob, emotions, emotion)
                         st.plotly_chart(fig_emotion, use_container_width=True)
                     
                     with col2:
-                        # Intensity probabilities
                         fig_intensity = create_intensity_chart(intensity_prob, intensities, intensity)
                         st.plotly_chart(fig_intensity, use_container_width=True)
                     
@@ -481,58 +472,44 @@ def main():
                             emoji = intensity_emojis.get(readable, "📊")
                             is_predicted = (i == result['predicted_intensity_id'])
                             marker = "👉 " if is_predicted else "   "
-                            st.write(f"{marker}{emoji} **{readable} ({intensity_name})**: {prob:.3f} ({prob*100:.1f}%)")
-                        
-                        # Technical details
-                        st.subheader("⚙️ Technical Details")
-                        st.write(f"**Text Length:** {len(text_input)} characters")
-                        st.write(f"**Emotion ID:** {result['predicted_emotion_id']}")
-                        st.write(f"**Intensity ID:** {result['predicted_intensity_id']}")
-                        st.write(f"**Model:** ashrafulparan/Emotion-BERT")
-                        st.write(f"**Device:** {next(model.parameters()).device}")
-                    
-                    # Show raw results in JSON format (for developers)
-                    with st.expander("🛠️ Raw Results (JSON)"):
-                        raw_results = {
-                            "text": text_input,
-                            "predicted_emotion": emotion,
-                            "predicted_intensity": intensity,
-                            "emotion_confidence": float(emotion_confidence),
-                            "intensity_confidence": float(intensity_confidence),
-                            "emotion_probabilities": {emotions[i]: float(prob) for i, prob in enumerate(emotion_prob)},
-                            "intensity_probabilities": {intensities[i]: float(prob) for i, prob in enumerate(intensity_prob)}
-                        }
-                        st.json(raw_results)
+                            st.write(f"{marker}{emoji} **{readable}**: {prob:.3f} ({prob*100:.1f}%)")
                     
                 except Exception as e:
                     st.error(f"❌ Error during analysis: {e}")
                     st.error("Please try again or check if the input text is valid.")
+                    st.error(f"Error details: {str(e)}")
         else:
             st.warning("⚠️ Please enter some text to analyze.")
     
-    # Additional features
+    # Batch Analysis
     st.header("🚀 Batch Analysis")
-    st.write("Analyze multiple texts at once:")
+    st.write("Analyze multiple texts at once (up to 10 texts for performance):")
     
     batch_texts = st.text_area(
         "Enter multiple texts (one per line):",
-        placeholder="ভোটের হার কম হলে দোষ, বেশি হলে দোষ, ভোটের সময় মারামারি না হওয়াটাও দোষের, আসলে সমালোচকরা কী চায় ??",
+        placeholder="আমি খুব খুশি।\nএটা দুঃখজনক।\nআমি রাগান্বিত।",
         height=100
     )
     
     if st.button("🔍 Analyze Batch", type="secondary"):
         if batch_texts.strip():
             texts = [text.strip() for text in batch_texts.split('\n') if text.strip()]
+            
+            # Limit batch size for cloud performance
+            if len(texts) > 10:
+                st.warning("⚠️ Limiting to first 10 texts for performance reasons.")
+                texts = texts[:10]
+            
             if texts:
                 with st.spinner(f"🧠 Analyzing {len(texts)} texts..."):
                     try:
                         results_df, _, _, emotion_probs, intensity_probs = predict_emotions_and_intensities(
-                            texts, model, tokenizer, id_to_emotion, id_to_intensity, batch_size=8
+                            texts, model, tokenizer, id_to_emotion, id_to_intensity, device, batch_size=4
                         )
                         
                         st.subheader("📊 Batch Results")
                         
-                        # Display results in a nice table
+                        # Display results
                         display_df = results_df.copy()
                         display_df['predicted_emotion'] = display_df['predicted_emotion'].str.title()
                         intensity_map = {"0.0": "Low", "1.0": "Medium", "2.0": "High"}
@@ -543,12 +520,12 @@ def main():
                             use_container_width=True,
                             column_config={
                                 "text": "Text",
-                                "predicted_emotion": "Emotion",
+                                "predicted_emotion": "Emotion", 
                                 "predicted_intensity": "Intensity"
                             }
                         )
                         
-                        # Download results
+                        # Download option
                         csv = results_df.to_csv(index=False)
                         st.download_button(
                             label="📥 Download Results as CSV",
