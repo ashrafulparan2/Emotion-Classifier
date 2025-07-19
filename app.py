@@ -498,7 +498,7 @@ def main():
     
     batch_texts = st.text_area(
         "Enter multiple texts (one per line):",
-        placeholder="আমি খুব খুশি।\nএটা দুঃখজনক।\nআমি রাগান্বিত।",
+        placeholder="ভোটের হার কম হলে দোষ, বেশি হলে দোষ, ভোটের সময় মারামারি না হওয়াটাও দোষের, আসলে সমালোচকরা কী চায় ??",
         height=100
     )
     
