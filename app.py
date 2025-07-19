@@ -265,9 +265,12 @@ def create_emotion_chart(probabilities, labels, predicted_emotion):
                  color_continuous_scale='viridis')
     
     fig.update_traces(marker_color=colors)
-    fig.update_layout(height=300, showlegend=False)
-    fig.update_xaxis(title="Probability", range=[0, 1])
-    fig.update_yaxis(title="Emotion")
+    fig.update_layout(
+        height=300, 
+        showlegend=False,
+        xaxis=dict(title="Probability", range=[0, 1]),
+        yaxis=dict(title="Emotion")
+    )
     
     return fig
 
@@ -294,9 +297,12 @@ def create_intensity_chart(probabilities, labels, predicted_intensity):
                  color_continuous_scale='plasma')
     
     fig.update_traces(marker_color=colors)
-    fig.update_layout(height=250, showlegend=False)
-    fig.update_xaxis(title="Probability", range=[0, 1])
-    fig.update_yaxis(title="Intensity")
+    fig.update_layout(
+        height=250, 
+        showlegend=False,
+        xaxis=dict(title="Probability", range=[0, 1]),
+        yaxis=dict(title="Intensity")
+    )
     
     return fig
 
@@ -332,7 +338,7 @@ def main():
         sample_texts = [
             "আমি খুব খুশি আজকে।",
             "এটা খুব দুঃখজনক খবর।",
-            "আমি রাগে ফেটে পড়েছি।",
+            "ভোটের হার কম হলে দোষ, বেশি হলে দোষ, ভোটের সময় মারামারি না হওয়াটাও দোষের, আসলে সমালোচকরা কী চায় ??",
             "এই দৃশ্যটা দেখে আমি অবাক হয়ে গেছি।",
             "আমি তোমাকে ভালোবাসি।"
         ]
