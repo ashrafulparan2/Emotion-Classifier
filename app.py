@@ -367,7 +367,7 @@ def main():
                 st.session_state.text_input = text
     
     # Load model
-    with st.spinner("🔄 Loading model from Hugging Face..."):
+    with st.spinner("🔄 Loading model..."):
         model, tokenizer, id_to_emotion, id_to_intensity, emotions, intensities = load_model_and_tokenizer()
     
     if model is None:
