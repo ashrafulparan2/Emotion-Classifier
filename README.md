@@ -1,105 +1,138 @@
-# Bangla Emotion Detection Streamlit App
+# Bangla Emotion and Intensity Detection App
 
-A web application for detecting emotions and their intensity in Bangla text using a fine-tuned BERT model.
+A Streamlit web application for detecting emotions and their intensity in Bangla text using a fine-tuned BERT model.
+
+## Model
+
+This app uses the `ashrafulparan/Emotion-BERT` model from Hugging Face, which is a fine-tuned BERT model for Bangla emotion classification.
+
+### Supported Emotions
+- **Angry** 😠
+- **Disgust** 🤢  
+- **Fear** 😨
+- **Happy** 😊
+- **Sad** 😢
+- **Surprise** 😮
+
+### Intensity Levels
+- **Low** (0.0) 🔻
+- **Medium** (1.0) 🔸
+- **High** (2.0) 🔺
 
 ## Features
 
-- 🎭 **Emotion Detection**: Identifies emotions like angry, fear, happy, love, sad, surprise
-- 📈 **Intensity Analysis**: Determines the intensity level (low, medium, high)
-- 📊 **Interactive Visualizations**: Bar charts showing probability distributions
-- 🇧🇩 **Bangla Text Support**: Optimized for Bengali/Bangla language
-- 🤗 **Hugging Face Integration**: Uses the model `ashrafulparan/Emotion-BERT`
+- 🎭 **Single Text Analysis**: Analyze emotion and intensity for individual texts
+- 📊 **Batch Analysis**: Process multiple texts at once
+- 📈 **Probability Visualization**: Interactive charts showing confidence scores
+- 💾 **Export Results**: Download analysis results as CSV
+- 🔍 **Detailed Analysis**: View all emotion and intensity probabilities
+- 🎯 **Quick Examples**: Pre-loaded sample texts for testing
 
 ## Installation
 
-1. **Install Python dependencies:**
+### Prerequisites
+- Python 3.8 or higher
+- pip package manager
+
+### Setup
+
+1. **Clone or download this repository**
+
+2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
-   
-   Or on Windows, you can run:
+
+3. **Run the application**:
    ```bash
-   setup.bat
+   streamlit run app_improved.py
    ```
 
-2. **Run the Streamlit app:**
-   ```bash
-   streamlit run app.py
-   ```
-
-3. **Open your browser** and go to `http://localhost:8501`
+   Or on Windows, simply double-click `run_app.bat`
 
 ## Usage
 
-1. Enter your Bangla text in the text area
-2. Click the "Analyze Emotion" button
-3. View the predicted emotion and intensity with confidence scores
-4. Explore the probability distributions in the interactive charts
-5. Check detailed results in the expandable section
+1. **Open the app** in your browser (usually at `http://localhost:8501`)
 
-## Example Texts
+2. **Enter Bangla text** in the text area
 
-The app includes several example texts you can try:
-- **Happy**: "আমি আজ খুব খুশি এবং উৎসাহিত বোধ করছি"
-- **Sad**: "আমি খুব দুঃখিত এবং হতাশ বোধ করছি"
-- **Angry**: "আমি খুব রাগান্বিত এবং বিরক্ত"
+3. **Click "Analyze Emotion"** to get predictions
 
-## Model Information
+4. **View results**:
+   - Predicted emotion and intensity with confidence scores
+   - Interactive probability charts
+   - Detailed breakdown of all probabilities
 
-- **Model**: `ashrafulparan/Emotion-BERT`
-- **Base Architecture**: BERT (Bidirectional Encoder Representations from Transformers)
-- **Task**: Multi-task classification (Emotion + Intensity)
-- **Language**: Bangla/Bengali
+5. **Try batch analysis** for multiple texts at once
 
-## Supported Emotions
+## Model Architecture
 
-1. **Angry** - রাগ
-2. **Fear** - ভয়
-3. **Happy** - খুশি
-4. **Love** - ভালোবাসা
-5. **Sad** - দুঃখ
-6. **Surprise** - বিস্ময়
+The app follows the exact inference logic from the training notebook:
 
-## Intensity Levels
-
-1. **Low** - কম
-2. **Medium** - মাঝারি
-3. **High** - বেশি
-
-## Requirements
-
-- Python 3.7+
-- PyTorch
-- Transformers (Hugging Face)
-- Streamlit
-- Plotly
-- Pandas
-- NumPy
+- **Base Model**: Bangla BERT (sagorsarker/bangla-bert-base)
+- **Architecture**: Multi-task classification with two heads:
+  - Emotion classifier (6 emotions)
+  - Intensity classifier (3 levels)
+- **Input**: Text sequences up to 128 tokens
+- **Output**: Emotion + Intensity predictions with confidence scores
 
 ## File Structure
 
 ```
-├── app.py              # Main Streamlit application
-├── inference.py        # Original inference script
-├── requirements.txt    # Python dependencies
-├── setup.bat          # Windows setup script
-└── README.md          # This file
+├── app_improved.py           # Main Streamlit application
+├── app.py                   # Original Streamlit app
+├── inference.py             # Simple command-line inference script
+├── inference.ipynb          # Jupyter notebook with inference logic
+├── labels_mapping.json      # Label mappings for emotions and intensities
+├── requirements.txt         # Python dependencies
+├── run_app.bat             # Windows batch script to run the app
+└── README.md               # This file
 ```
+
+## Technical Details
+
+- **Framework**: Streamlit for web interface
+- **Model Loading**: Hugging Face Transformers
+- **Inference**: PyTorch with CUDA support (if available)
+- **Visualization**: Plotly for interactive charts
+- **Reproducibility**: Fixed random seeds for consistent results
+
+## Example Texts
+
+Try these sample Bangla texts:
+
+- `আমি খুব খুশি আজকে।` (I am very happy today)
+- `এটা খুব দুঃখজনক খবর।` (This is very sad news)  
+- `আমি রাগে ফেটে পড়েছি।` (I am bursting with anger)
+- `এই দৃশ্যটা দেখে আমি অবাক হয়ে গেছি।` (I was surprised to see this scene)
 
 ## Troubleshooting
 
-1. **Model loading issues**: Make sure you have a stable internet connection to download the model from Hugging Face
-2. **CUDA errors**: The app will automatically use CPU if CUDA is not available
-3. **Memory issues**: For large texts, the model uses a maximum length of 128 tokens
+### Model Loading Issues
+- Ensure you have a stable internet connection
+- Check if the Hugging Face model `ashrafulparan/Emotion-BERT` is accessible
+- If using locally, ensure `labels_mapping.json` is in the same directory
 
-## Contributing
+### Performance
+- The app works on both CPU and GPU
+- GPU will provide faster inference for batch processing
+- First-time model loading may take a few minutes
 
-Feel free to contribute by:
-- Adding more example texts
-- Improving the UI/UX
-- Adding new features
-- Reporting bugs
+### Dependencies
+- If you encounter package conflicts, try creating a virtual environment:
+  ```bash
+  python -m venv venv
+  source venv/bin/activate  # On Windows: venv\Scripts\activate
+  pip install -r requirements.txt
+  ```
 
 ## License
 
-This project is open source. Please check the individual model license on Hugging Face.
+This project is for educational and research purposes. Please respect the license terms of the underlying BERT model and datasets.
+
+## Acknowledgments
+
+- Hugging Face for the Transformers library
+- Streamlit for the web framework
+- The creators of the Bangla BERT model
+- The dataset contributors for Bangla emotion classification
