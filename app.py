@@ -197,10 +197,10 @@ def load_model_and_tokenizer():
         model.to(device)
         model.eval()
         
-        st.success(f"✅ Model loaded successfully from {model_name}")
-        st.info(f"📋 Emotions: {emotions}")
-        st.info(f"📋 Intensities: {intensities}")
-        st.info(f"🖥️ Device: {device}")
+        st.success(f"✅ Model loaded successfully")
+        # st.info(f"📋 Emotions: {emotions}")
+        # st.info(f"📋 Intensities: {intensities}")
+        # st.info(f"🖥️ Device: {device}")
         
         return model, tokenizer, id_to_emotion, id_to_intensity, emotions, intensities
         
@@ -327,15 +327,15 @@ def create_intensity_chart(probabilities, labels, predicted_intensity):
 def main():
     """Main Streamlit app"""
     
-    st.title("🇧🇩 Bangla Emotion and Intensity Detection")
+    st.title("Bangla Emotion and Intensity Detection")
     st.markdown("### Analyze emotions and their intensity in Bangla text using fine-tuned BERT")
-    st.markdown("**Model:** [ashrafulparan/Emotion-BERT](https://huggingface.co/ashrafulparan/Emotion-BERT)")
+    # st.markdown("**Model:** [ashrafulparan/Emotion-BERT](https://huggingface.co/ashrafulparan/Emotion-BERT)")
     
     # Sidebar with information
     with st.sidebar:
         st.header("📖 About")
         st.write("This app uses a fine-tuned BERT model to detect emotions and their intensity in Bangla text.")
-        st.write("**Model:** ashrafulparan/Emotion-BERT")
+        # st.write("**Model:** ashrafulparan/Emotion-BERT")
         st.write("**Emotions:** Angry, Disgust, Fear, Happy, Sad, Surprise")
         st.write("**Intensity Levels:** Low (0.0), Medium (1.0), High (2.0)")
         
@@ -488,7 +488,7 @@ def main():
                         st.write(f"**Text Length:** {len(text_input)} characters")
                         st.write(f"**Emotion ID:** {result['predicted_emotion_id']}")
                         st.write(f"**Intensity ID:** {result['predicted_intensity_id']}")
-                        st.write(f"**Model:** ashrafulparan/Emotion-BERT")
+                        # st.write(f"**Model:** ashrafulparan/Emotion-BERT")
                         st.write(f"**Device:** {next(model.parameters()).device}")
                     
                     # Show raw results in JSON format (for developers)
@@ -568,7 +568,6 @@ def main():
     st.markdown("---")
     st.markdown(
         "Made with ❤️ using [Streamlit](https://streamlit.io) and [Hugging Face Transformers](https://huggingface.co/transformers/) | "
-        "Model: [ashrafulparan/Emotion-BERT](https://huggingface.co/ashrafulparan/Emotion-BERT)"
     )
 
 if __name__ == "__main__":
