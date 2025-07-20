@@ -150,7 +150,7 @@ def load_model_and_tokenizer():
     model_name = "ashrafulparan/Emotion-BERT"
     
     try:
-        st.info("Loading model from Hugging Face...")
+        # st.info("Loading model from Hugging Face...")
         
         # Load tokenizer
         tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -197,7 +197,7 @@ def load_model_and_tokenizer():
         model.to(device)
         model.eval()
         
-        st.success(f"✅ Model loaded successfully")
+        # st.success(f"✅ Model loaded successfully")
         # st.info(f"📋 Emotions: {emotions}")
         # st.info(f"📋 Intensities: {intensities}")
         # st.info(f"🖥️ Device: {device}")
