@@ -345,11 +345,11 @@ def main():
         st.write("3. View the predicted emotion and intensity")
         st.write("4. Explore the probability distributions")
         
-        st.header("📊 Model Info")
-        st.write("- Based on Bangla BERT")
-        st.write("- Multi-task classification")
-        st.write("- Trained on Bangla emotion dataset")
-        st.write("- Follows exact notebook inference logic")
+        # st.header("📊 Model Info")
+        # st.write("- Based on Bangla BERT")
+        # st.write("- Multi-task classification")
+        # st.write("- Trained on Bangla emotion dataset")
+        # st.write("- Follows exact notebook inference logic")
         
         # Sample texts for quick testing
         st.header("🎯 Quick Examples")
